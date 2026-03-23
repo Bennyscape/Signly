@@ -1,17 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/layout/Header';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { CameraFeed } from '@/components/camera/CameraFeed';
 import { PredictionBar } from '@/components/recognition/PredictionBar';
+import { ConfidenceMeter } from '@/components/recognition/ConfidenceMeter';
 import { TranscriptPanel } from '@/components/transcript/TranscriptPanel';
 import { SpeechControls } from '@/components/speech/SpeechControls';
+import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { useModel } from '@/hooks/useModel';
 import { useGestureBuffer } from '@/hooks/useGestureBuffer';
 import { useRecognitionStore } from '@/stores/recognition-store';
 import { useTranscriptStore } from '@/stores/transcript-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import { useSessionStore } from '@/stores/session-store';
 import { normalizeLandmarks } from '@/lib/preprocessing';
 import { isLetterLabel, isControlLabel } from '@/lib/gesture-map';
 import type { HandData } from '@/types';
@@ -21,7 +25,6 @@ export default function DashboardPage() {
   const { processNewPrediction } = useGestureBuffer();
   const setPredictions = useRecognitionStore((s) => s.setPredictions);
   const setStablePrediction = useRecognitionStore((s) => s.setStablePrediction);
-  const setStabilityCount = useRecognitionStore((s) => s.setStabilityCount);
   const setModelLoaded = useRecognitionStore((s) => s.setModelLoaded);
   const setInferenceTime = useRecognitionStore((s) => s.setInferenceTime);
   const addLetter = useTranscriptStore((s) => s.addLetter);
@@ -29,20 +32,45 @@ export default function DashboardPage() {
   const deleteLast = useTranscriptStore((s) => s.deleteLast);
   const confidenceThreshold = useSettingsStore((s) => s.confidenceThreshold);
   const stabilityFrames = useSettingsStore((s) => s.stabilityFrames);
+  const showLandmarks = useSettingsStore((s) => s.showLandmarks);
+  const showOnboarding = useSettingsStore((s) => s.showOnboarding);
+  const startSession = useSessionStore((s) => s.startSession);
+  const endSession = useSessionStore((s) => s.endSession);
+  const incrementRecognition = useSessionStore((s) => s.incrementRecognition);
 
   const lastCommitRef = useRef<number>(0);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+  // Show onboarding on first visit
+  useEffect(() => {
+    setShowOnboardingModal(showOnboarding);
+  }, [showOnboarding]);
+
+  // Start a recognition session on mount
+  useEffect(() => {
+    startSession();
+    return () => {
+      endSession();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hasAttemptedModelLoad = useRef(false);
 
   // Load model on mount
   useEffect(() => {
-    if (!isLoaded && !isLoading) {
-      loadModel('/models/alphabet/model.json').then(() => {
-        setModelLoaded(true);
-      }).catch(() => {
-        // Model may not exist yet — that's ok for development
-        console.warn('Model not found. Running in demo mode.');
-      });
+    if (!hasAttemptedModelLoad.current) {
+      hasAttemptedModelLoad.current = true;
+      loadModel('/models/alphabet/model.json')
+        .then(() => {
+          setModelLoaded(true);
+        })
+        .catch(() => {
+          // Model may not exist yet — that's ok for development
+          console.warn('Model not found. Running in demo mode.');
+        });
     }
-  }, [isLoaded, isLoading, loadModel, setModelLoaded]);
+  }, [loadModel, setModelLoaded]);
 
   // Handle landmark data from camera
   const handleLandmarks = useCallback(
@@ -81,6 +109,7 @@ export default function DashboardPage() {
           const now = Date.now();
           if (now - lastCommitRef.current > 500) {
             lastCommitRef.current = now;
+            incrementRecognition();
 
             // Apply the recognized gesture
             if (isLetterLabel(stable.label)) {
@@ -105,6 +134,7 @@ export default function DashboardPage() {
       addLetter,
       addSpace,
       deleteLast,
+      incrementRecognition,
     ]
   );
 
@@ -133,12 +163,20 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1">
           {/* Left — Camera Feed */}
           <div className="lg:col-span-3 flex flex-col gap-4">
-            <CameraFeed onLandmarks={handleLandmarks} showLandmarks={true} />
+            <CameraFeed onLandmarks={handleLandmarks} showLandmarks={showLandmarks} />
           </div>
 
           {/* Right — Predictions, Transcript, Speech */}
           <div className="lg:col-span-2 flex flex-col gap-4">
-            <PredictionBar />
+            {/* Confidence Meter + Predictions */}
+            <div className="flex gap-4">
+              <div className="flex items-center justify-center">
+                <ConfidenceMeter size={90} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <PredictionBar />
+              </div>
+            </div>
             <TranscriptPanel />
             <SpeechControls />
           </div>
@@ -147,6 +185,13 @@ export default function DashboardPage() {
         {/* Status Bar */}
         <StatusBar />
       </main>
+
+      {/* Onboarding Modal */}
+      <AnimatePresence>
+        {showOnboardingModal && (
+          <OnboardingModal onComplete={() => setShowOnboardingModal(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

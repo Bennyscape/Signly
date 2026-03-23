@@ -5,13 +5,18 @@ import { Hand, Moon, Sun, Settings, Github } from 'lucide-react';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { SettingsDrawer } from './SettingsDrawer';
 
 export function Header() {
   const theme = useSettingsStore((s) => s.theme);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
   const [mounted, setMounted] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const toggleTheme = useCallback(() => {
     updateSetting('theme', theme === 'dark' ? 'light' : 'dark');
@@ -29,6 +34,7 @@ export function Header() {
   }, [theme, mounted]);
 
   return (
+    <>
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -68,13 +74,22 @@ export function Header() {
         {/* Actions */}
         <div className="flex items-center gap-2">
           {mounted && (
-            <button
-              onClick={toggleTheme}
-              className="w-9 h-9 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all focus-ring"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <>
+              <button
+                onClick={toggleTheme}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all focus-ring"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-surface-hover transition-all focus-ring"
+                aria-label="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </>
           )}
           <Link
             href="/dashboard"
@@ -94,5 +109,7 @@ export function Header() {
         </div>
       </div>
     </motion.header>
-  );
+
+    <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+  </>);
 }

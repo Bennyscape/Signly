@@ -54,6 +54,7 @@ export function useModel(): UseModelReturn {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model');
       setIsLoaded(false);
+      throw err;
     } finally {
       setIsLoading(false);
     }

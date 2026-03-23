@@ -17,7 +17,7 @@ interface CameraFeedProps {
 export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const fpsCounterRef = useRef({ frames: 0, lastTime: performance.now() });
+  const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
   const { videoRef, isActive, error, start, stop } = useCamera('user');
   const { handData, allHands, isReady, processFrame } = useMediaPipe();
   const setDetecting = useRecognitionStore((s) => s.setDetecting);
@@ -69,9 +69,17 @@ export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProp
 
   // Main render loop
   useEffect(() => {
-    if (!isActive || !isReady) return;
+    if (!isActive || !isReady) {
+      console.log('[CameraFeed] Render loop waiting — isActive:', isActive, 'isReady:', isReady);
+      return;
+    }
+
+    console.log('[CameraFeed] ✅ Starting render loop');
+    let running = true;
 
     const loop = async () => {
+      if (!running) return;
+
       if (videoRef.current && videoRef.current.readyState >= 2) {
         // Process frame through MediaPipe
         await processFrame(videoRef.current);
@@ -86,12 +94,15 @@ export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProp
         }
       }
 
-      animFrameRef.current = requestAnimationFrame(loop);
+      if (running) {
+        animFrameRef.current = requestAnimationFrame(loop);
+      }
     };
 
     animFrameRef.current = requestAnimationFrame(loop);
 
     return () => {
+      running = false;
       cancelAnimationFrame(animFrameRef.current);
     };
   }, [isActive, isReady, processFrame, setFps, videoRef]);

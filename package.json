@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "mkdir -p public/mediapipe/hands && cp -r node_modules/@mediapipe/hands/* public/mediapipe/hands/"
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",

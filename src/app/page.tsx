@@ -90,17 +90,17 @@ const steps = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen bg-bg-primary ">
       <Header />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden flex flex-col items-center justify-center">
         {/* Background Effects */}
         <div className="absolute inset-0 bg-grid opacity-30" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-[120px]" />
 
-        <div className="relative max-w-[1200px] mx-auto px-6 pt-20 pb-28">
+        <div className="relative max-w-[1200px] mx-auto px-6 mt-20 pb-28">
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -259,7 +259,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 flex flex-col items-center justify-center">
         <div className="max-w-[1200px] mx-auto">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -297,8 +297,8 @@ export default function HomePage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 px-6 bg-bg-surface/50">
-        <div className="max-w-[1200px] mx-auto">
+      <section className="py-24 px-6 bg-bg-surface/50 flex flex-col items-center justify-center">
+        <div className="max-w-[1200px] mx-auto  ">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
@@ -343,7 +343,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 flex flex-col items-center justify-center">
         <div className="max-w-[800px] mx-auto text-center">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -369,7 +369,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8 px-6">
+      <footer className="border-t border-border py-8 px-6 ">
         <div className="max-w-[1200px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Hand className="w-4 h-4 text-accent" />
