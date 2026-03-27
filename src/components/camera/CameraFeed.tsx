@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Camera, CameraOff, FlipHorizontal } from 'lucide-react';
 import { useCamera } from '@/hooks/useCamera';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
+import { useModel } from '@/hooks/useModel';
 import { useRecognitionStore } from '@/stores/recognition-store';
 import { HAND_CONNECTIONS } from '@/types';
 import type { HandData } from '@/types';
@@ -12,17 +13,48 @@ import type { HandData } from '@/types';
 interface CameraFeedProps {
   onLandmarks?: (handData: HandData | null) => void;
   showLandmarks?: boolean;
+  modelPath?: string;
+  metadataPath?: string;
 }
 
-export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProps) {
+export function CameraFeed({ 
+  onLandmarks, 
+  showLandmarks = true,
+  modelPath = '/models/msasl_100_model.json',
+  metadataPath = '/models/msasl_100_metadata.json',
+}: CameraFeedProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const fpsCounterRef = useRef({ frames: 0, lastTime: 0 });
+  const inferenceTimeRef = useRef<number>(0);
   const { videoRef, isActive, error, start, stop } = useCamera('user');
   const { handData, allHands, isReady, processFrame } = useMediaPipe();
+  const { isLoaded, isLoading, error: modelError, predictFromLandmarks, loadModel } = useModel();
   const setDetecting = useRecognitionStore((s) => s.setDetecting);
   const setNumHands = useRecognitionStore((s) => s.setNumHands);
   const setFps = useRecognitionStore((s) => s.setFps);
+  const setModelLoaded = useRecognitionStore((s) => s.setModelLoaded);
+  const setPredictions = useRecognitionStore((s) => s.setPredictions);
+  const setInferenceTime = useRecognitionStore((s) => s.setInferenceTime);
+
+  // Load ASL model on mount
+  useEffect(() => {
+    if (!isActive) return;
+    
+    const initModel = async () => {
+      try {
+        console.log('[CameraFeed] Loading ASL model...');
+        await loadModel(modelPath, metadataPath);
+        setModelLoaded(true);
+        console.log('[CameraFeed] ✅ Model loaded successfully');
+      } catch (err) {
+        console.error('[CameraFeed] Model loading failed:', err);
+        setModelLoaded(false);
+      }
+    };
+
+    initModel();
+  }, [isActive, modelPath, metadataPath, loadModel, setModelLoaded]);
 
   // Draw landmarks on canvas
   const drawLandmarks = useCallback(
@@ -84,6 +116,28 @@ export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProp
         // Process frame through MediaPipe
         await processFrame(videoRef.current);
 
+        // Make ASL predictions if model is loaded and hands are detected
+        if (isLoaded && allHands.length > 0) {
+          try {
+            const startTime = performance.now();
+            
+            // Get predictions from first hand
+            const predictions = await predictFromLandmarks(allHands[0]);
+            
+            const endTime = performance.now();
+            inferenceTimeRef.current = endTime - startTime;
+
+            // Update store with predictions
+            setPredictions(predictions);
+            setInferenceTime(inferenceTimeRef.current);
+          } catch (err) {
+            console.warn('[CameraFeed] Prediction error:', err);
+          }
+        } else if (!isLoaded && allHands.length > 0) {
+          // Clear predictions if model not ready
+          setPredictions([]);
+        }
+
         // FPS counter
         fpsCounterRef.current.frames++;
         const now = performance.now();
@@ -105,7 +159,7 @@ export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProp
       running = false;
       cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isActive, isReady, processFrame, setFps, videoRef]);
+  }, [isActive, isReady, isLoaded, allHands, processFrame, setFps, setPredictions, setInferenceTime, predictFromLandmarks, videoRef]);
 
   // Update recognition store & draw when hand data changes
   useEffect(() => {
@@ -212,12 +266,14 @@ export function CameraFeed({ onLandmarks, showLandmarks = true }: CameraFeedProp
         </div>
       )}
 
-      {/* MediaPipe Loading */}
-      {isActive && !isReady && (
+      {/* MediaPipe & Model Loading */}
+      {isActive && (!isReady || isLoading) && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg-surface/50 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <p className="text-text-secondary text-sm">Loading hand tracking...</p>
+            <p className="text-text-secondary text-sm">
+              {!isReady ? 'Loading hand tracking...' : 'Loading ASL model...'}
+            </p>
           </div>
         </div>
       )}
