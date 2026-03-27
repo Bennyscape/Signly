@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASL.ai — American Sign Language to Speech",
+  title: "Signly — American Sign Language to Speech",
   description:
     "Real-time ASL to Speech AI system. Translate American Sign Language to text and speech using computer vision and deep learning — entirely in your browser.",
   keywords: ["ASL", "sign language", "speech", "AI", "accessibility", "MediaPipe", "TensorFlow"],

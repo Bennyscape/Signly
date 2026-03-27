@@ -51,7 +51,7 @@ export function Header() {
             <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-success rounded-full animate-pulse-glow" />
           </div>
           <span className="text-lg font-bold text-text-primary tracking-tight">
-            ASL<span className="text-accent">.ai</span>
+            Sign<span className="text-accent">ly</span>
           </span>
         </Link>
 

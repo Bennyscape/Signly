@@ -24,8 +24,9 @@ export function HeroScrollAnimation() {
 
   // Apply spring physics for buttery smooth standard mouse wheel scrolling
   const smoothProgress = useSpring(scrollYProgress, {
-    stiffness: 100,
-    damping: 30,
+    stiffness: 40,
+    damping: 20,
+    mass: 0.5,
     restDelta: 0.001
   });
 
@@ -36,18 +37,17 @@ export function HeroScrollAnimation() {
   const textScale = useTransform(smoothProgress, [0, 0.1], [1, 0.95]);
   const textY = useTransform(smoothProgress, [0, 0.1], [0, -100]);
   
-  // Cinematic Dolly Out / Step Backward Effect
-  // The video wrapper starts exactly at 100vw/100vh so it IS the background
-  // At 65% scroll, it shrinks down seamlessly to dashboard size
-  const wrapperWidth = useTransform(smoothProgress, [0.65, 0.75], ["100vw", "1024px"]); // max-w-5xl
-  const wrapperHeight = useTransform(smoothProgress, [0.65, 0.75], ["100vh", "576px"]); // 16:9
-  const wrapperBorderRadius = useTransform(smoothProgress, [0.65, 0.75], ["0px", "24px"]); 
+  // Darken background for the text initially, brighten in middle, darken again at end for video player
+  const overlayOpacity = useTransform(smoothProgress, [0, 0.1, 0.65, 0.75], [0.65, 0.1, 0.1, 0.8]);
+
+  // Video Placeholder Entrance animations
+  // At 65%, the video placeholder starts as a massive (scale 3), fully blurred, transparent overlay.
+  // It fades in and scales down to its final crisp state at 75% scroll depth.
+  const videoOpacity = useTransform(smoothProgress, [0.65, 0.75], [0, 1]);
+  const videoScale = useTransform(smoothProgress, [0.65, 0.75], [3, 1]);
+  const videoFilter = useTransform(smoothProgress, [0.65, 0.75], ['blur(40px)', 'blur(0px)']);
   
-  // Play button and borders fade in as we step backward
-  const uiOpacity = useTransform(smoothProgress, [0.65, 0.75], [0, 1]);
-  
-  // Background fades from black to dark gray to give environment depth when zooming out
-  const bgEnvironmentOpacity = useTransform(smoothProgress, [0.65, 0.75], [1, 0.6]);
+  const canvasOpacity = useTransform(smoothProgress, [0.65, 0.7], [1, 1]); // Keep canvas sequences visible in background
 
   // Preload images
   useEffect(() => {
@@ -60,7 +60,7 @@ export function HeroScrollAnimation() {
           const img = new Image();
           img.src = currentFrame(i + 1);
           img.onload = () => resolve(img);
-          img.onerror = () => resolve(img);
+          img.onerror = () => resolve(img); // Resolve even on error to not block
         });
       });
 
@@ -88,7 +88,7 @@ export function HeroScrollAnimation() {
     const img = images[index - 1];
     if (!img.complete || img.naturalWidth === 0) return;
     
-    // Manual cover logic to keep aspect ratio and fill the canvas exactly
+    // Manual cover logic to keep aspect ratio and fill the screen perfectly
     const canvasRatio = canvas.width / canvas.height;
     const imgRatio = img.width / img.height;
 
@@ -107,7 +107,9 @@ export function HeroScrollAnimation() {
       offsetX = (canvas.width - drawWidth) / 2;
     }
 
+    // Explicitly wipe the canvas and draw new frame locked 1:1 to scroll
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Smooth image rendering
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
@@ -120,16 +122,19 @@ export function HeroScrollAnimation() {
     }
   });
 
-  // Since we are changing CSS width dynamically, the canvas pixel buffer 
-  // needs to be at least window.innerWidth to not look blurry during the transition
+  // Handle Resize and Initial Render
   useEffect(() => {
     const handleResize = () => {
       const canvas = canvasRef.current;
       if (canvas) {
+        // Set canvas to actual window inner dimensions mapped to devicePixelRatio for ultra crisp retina rendering
         const dpr = window.devicePixelRatio || 1;
-        // Always render at maximum possible size to keep quality high even when wrapper is 100vw
         canvas.width = window.innerWidth * dpr;
         canvas.height = window.innerHeight * dpr;
+        
+        // Scale down via CSS to match logical viewport dimensions
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
 
         const idx = Math.min(Math.max(1, Math.round(frameIndex.get())), FRAME_COUNT);
         renderFrame(idx);
@@ -159,54 +164,20 @@ export function HeroScrollAnimation() {
 
   return (
     <div ref={containerRef} className="relative w-full h-[500vh] bg-bg-primary">
-      <div className="sticky top-0 w-full h-screen overflow-hidden bg-black flex flex-col items-center justify-center">
+      <div className="sticky top-0 w-full h-screen overflow-hidden bg-black">
+        <motion.canvas
+          ref={canvasRef}
+          style={{ opacity: canvasOpacity }}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
         
-        {/* Environment background that reveals when Dolly-Out happens */}
+        {/* Dark overlay for readability and cinematic fade */}
         <motion.div 
-          className="absolute inset-0 bg-bg-primary z-0" 
-          style={{ opacity: useTransform(bgEnvironmentOpacity, v => 1 - v) }} 
+          className="absolute inset-0 bg-black z-10 pointer-events-none" 
+          style={{ opacity: overlayOpacity }}
         />
 
-        {/* The Cinematic Video Wrapper */}
-        <motion.div
-          style={{ 
-            width: wrapperWidth, 
-            height: wrapperHeight,
-            borderRadius: wrapperBorderRadius,
-            maxWidth: '100%',
-          }}
-          className="relative z-10 flex items-center justify-center overflow-hidden bg-black shadow-2xl group"
-          onMouseEnter={() => setIsVideoHovered(true)}
-          onMouseLeave={() => setIsVideoHovered(false)}
-        >
-          {/* Canvas always fills exactly whatever size the wrapper dictates */}
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          />
-          
-          {/* Fading UI elements that appear smoothly during zoom out */}
-          <motion.div 
-            className="absolute inset-0 border border-white/20 rounded-2xl pointer-events-none"
-            style={{ opacity: uiOpacity }}
-          />
-
-          <motion.div 
-            className="absolute inset-0 flex items-center justify-center pointer-events-auto cursor-pointer"
-            style={{ opacity: uiOpacity }}
-          >
-            <motion.div 
-              animate={{ scale: isVideoHovered ? 1.1 : 1 }}
-              className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-all"
-            >
-              <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-500/20 text-white">
-                  <Play fill="white" className="w-8 h-8 ml-1" />
-              </div>
-            </motion.div>
-          </motion.div>
-        </motion.div>
-
-        {/* Hero Content (Overlays the screen initially, fades out early) */}
+        {/* Hero Content (Fades out early) */}
         <motion.div 
           className="absolute inset-0 z-20 flex flex-col items-center justify-center px-6 pointer-events-none"
           style={{ opacity: textOpacity, y: textY, scale: textScale }}
@@ -272,7 +243,46 @@ export function HeroScrollAnimation() {
             </motion.div>
           </div>
         </motion.div>
+
+        {/* Video Player Placeholder (Scales down and unblurs from fullscreen) */}
+        <motion.div
+          className="absolute inset-0 z-30 flex flex-col items-center justify-center px-6 pointer-events-none"
+          style={{ opacity: videoOpacity, scale: videoScale, filter: videoFilter }}
+        >
+          <div 
+            className="relative w-full max-w-5xl aspect-video rounded-2xl border border-white/20 bg-gray-900/80 backdrop-blur-md shadow-2xl overflow-hidden cursor-pointer pointer-events-auto group"
+            onMouseEnter={() => setIsVideoHovered(true)}
+            onMouseLeave={() => setIsVideoHovered(false)}
+          >
+            {/* The actual image or video would go here */}
+            {/* Placeholder dashboard visual representing the uploaded image */}
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center" />
+            
+            {/* Simulating the dashboard content layout lightly so it's not totally blank */}
+            <div className="absolute inset-0 p-8 grid grid-cols-4 gap-4 opacity-50">
+              <div className="col-span-1 rounded-xl bg-white/5" />
+              <div className="col-span-3 grid grid-cols-3 gap-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-24 rounded-lg bg-white/5 border border-white/10" />
+                ))}
+              </div>
+            </div>
+
+            {/* Play Button Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.div 
+                animate={{ scale: isVideoHovered ? 1.1 : 1 }}
+                className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-all"
+              >
+                <div className="w-20 h-20 rounded-full flex items-center justify-center bg-blue-500/20 text-white">
+                    <Play fill="white" className="w-8 h-8 ml-1" />
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
 }
+
